@@ -29,5 +29,3 @@ def main():
     display(cannyImg)
 
 main()
-
-
