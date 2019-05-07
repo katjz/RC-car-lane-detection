@@ -3,8 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def readImg():
-    imgName = "test_image.jpg"
+    imgName = "./test_images/test_image.jpg"
     img = cv2.imread(imgName)
+    plt.imshow(img)
+    plt.show()
+    exit()
     lane_img = np.copy(img)
     return lane_img
 
@@ -85,6 +88,7 @@ def analyzeFrame(frame):
     cv2.waitKey(1)
 
 def main():
+    readImg()
     cap = cv2.VideoCapture("test2.mp4")
     while cap.isOpened():
         frame = cap.read()[1]
