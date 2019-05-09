@@ -20,7 +20,9 @@ def canny(img):
 def roi(img,vertices):
     # create blank matrix with same height/width
     mask = np.zeros_like(img)
+
     matchMaskColor = 255 # mask color for grayscale image
+
     # fill inside roi polygon
     cv2.fillPoly(mask,vertices,matchMaskColor)
 
@@ -102,7 +104,66 @@ def lineOverlay(img,lines,color=[0,255,0],thickness=4):
     # Merge line image with original img
     copy = cv2.addWeighted(copy,0.8,lineImg,1.0,0.0)
 
+
+
+    # Create blank image of same size
+    fillImg = np.zeros((copy.shape[0],copy.shape[1],3), dtype=np.uint8)
+    # fill in region between lane lines
+    pairs=[[]]
+    for line in lines[0]:
+        for coord in line:
+            pairs[0].append(coord)
+    for x1,y1,x2,y2,x3,y3,x4,y4 in pairs:
+        pts = np.array([[x1,y1],[x2,y2],[x4,y4],[x3,y3]], np.int32)
+        cv2.fillConvexPoly(fillImg, pts, [0,255,0,50])
+
+    # Merge line image with original img
+    copy = cv2.addWeighted(fillImg,0.3,copy,1.0,0.0)
+
     return copy
+
+
+def getCenter(camCenter_x,laneLines):
+    l_line = laneLines[0]
+    r_line = laneLines[1]
+    # get x coordinate of start endpoint of L and R lane lines
+    xL = l_line[0]
+    xR = r_line[0]
+    laneCenter_x = xL + (xR-xL)/2
+    print("Center: ", laneCenter_x)
+
+    # compute number of pixels off center
+    offCenter = laneCenter_x - camCenter_x
+    if offCenter < 0:
+        print("Car is ",abs(offCenter)," pixels left of center.")
+    elif offCenter > 0:
+        print("Car is ",offCenter," pixels right of center.")
+
+    # get x coordinate of horizon endpoint of L and R lane laneLines
+    xL = l_line[2]
+    xR = r_line[2]
+    topCenter_x = xL + (xR-xL)//2
+
+    # build center line coordinates
+    centerLine = [int(laneCenter_x),l_line[1],topCenter_x,l_line[3]]
+    return offCenter,centerLine
+
+def drawCenter(img,camCenter,laneCenter):
+    # Copy original image
+    #copy = np.copy(img)
+    # Create blank image of same size
+    #lineImg = np.zeros((copy.shape[0],copy.shape[1],3), dtype=np.uint8)
+
+    # Loop over lines and draw them on blank img
+    for x1,y1,x2,y2 in camCenter:
+        cv2.line(img,(x1,y1),(x2,y2),[255,0,0],4)
+    for x1,y1,x2,y2 in laneCenter:
+        cv2.line(img,(x1,y1),(x2,y2),[255,255,0],4)
+
+    # Merge line image with original img
+    #copy = cv2.addWeighted(copy,0.8,lineImg,1.0,0.0)
+
+    return img
 
 # Helper function to display given image
 def display(img):
@@ -129,7 +190,6 @@ def pipeline(img):
 
     # complete step 3 --> crop image to ROI
     croppedImg = roi(cannyImg,np.array([roi_vertices],np.int32))
-
     # complete step 4 --> Hough transform
     lines = hough(croppedImg)
 
@@ -137,23 +197,28 @@ def pipeline(img):
     laneLines = groupLines(img,lines)
 
     # complete step 6 --> overlay detected lane lines onto original image
-    img = lineOverlay(img,[laneLines])
-    #plt.figure()
+    img = lineOverlay(img,[laneLines],)
     #display(img)
+
+    # get coordinate of center of image
+    center_x = width//2
+    offCenter,laneCenterLine = getCenter(center_x,laneLines)
+    camCenterLine = [center_x,height,center_x,int(3*height/4)]
+
+    img = drawCenter(img,[camCenterLine],[laneCenterLine])
+    display(img)
+    #plt.figure()
     #plt.imshow(img)
     #cv2.waitKey(wait)
-
     return img
-
 
 ## Use pipeline to process still image
 def processImg():
-    imgName = "./test_images/test_image.jpg"
-    #imgName = "./test_images/solidWhiteCurve.jpg"
+    #imgName = "./test_images/test_image.jpg"
+    imgName = "./test_images/solidWhiteCurve.jpg"
     img = cv2.imread(imgName)
     img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-    #img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-    pipeline(img,0) # wait is 0ms for still image
+    pipeline(img) # wait is 0ms for still image
 
 ## Use pipeline to process video
 def processVideo():
@@ -168,15 +233,15 @@ def processVideo():
     cv2.destroyAllWindows()
 
 def saveVideo():
-    white_output = 'solidWhiteRight_output.mp4'
-    clip1 = VideoFileClip("solidWhiteRight.mp4")
+    white_output = './video_output/test2_out.mp4'
+    clip1 = VideoFileClip("./test_video/test2.mp4")
     white_clip = clip1.fl_image(pipeline)
     white_clip.write_videofile(white_output, audio=False)
 
 def main():
-    #processImg()
+    processImg()
     #processVideo()
-    saveVideo()
+    #saveVideo()
 
 
 
