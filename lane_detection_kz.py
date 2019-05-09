@@ -47,6 +47,10 @@ def hough(img):
 
 ## Step 4: Extract single Left and Right lane lines
 def groupLines(img,lines):
+    # if there are no lines to draw, return
+    if lines is None:
+        return img
+
     minSlope = 0.5
 
     leftLine_x = []
@@ -71,13 +75,18 @@ def groupLines(img,lines):
     min_y = img.shape[0] * (3/5) # min x --> just below horizon
     max_y = img.shape[0]        # max x --> bottom of image
 
-    polyLeft = np.poly1d(np.polyfit(leftLine_y,leftLine_x,deg=1))
-    left_x_start = int(polyLeft(max_y))
-    left_x_end = int(polyLeft(min_y))
+    try:
+        polyLeft = np.poly1d(np.polyfit(leftLine_y,leftLine_x,deg=1))
+        left_x_start = int(polyLeft(max_y))
+        left_x_end = int(polyLeft(min_y))
 
-    polyRight = np.poly1d(np.polyfit(rightLine_y,rightLine_x,deg=1))
-    right_x_start = int(polyRight(max_y))
-    right_x_end = int(polyRight(min_y))
+
+        polyRight = np.poly1d(np.polyfit(rightLine_y,rightLine_x,deg=1))
+        right_x_start = int(polyRight(max_y))
+        right_x_end = int(polyRight(min_y))
+
+    except TypeError:
+        return None
 
     leftLine = [left_x_start,max_y,left_x_end,int(min_y)]
     rightLine = [right_x_start,max_y,right_x_end,int(min_y)]
@@ -89,7 +98,10 @@ def groupLines(img,lines):
 def lineOverlay(img,lines,color=[0,255,0],thickness=4):
     # if there are no lines to draw, return
     if lines is None:
-        return
+        return None
+    for line in lines:
+        if line is None:
+            return None
 
     # Copy original image
     copy = np.copy(img)
@@ -130,14 +142,15 @@ def getCenter(camCenter_x,laneLines):
     xL = l_line[0]
     xR = r_line[0]
     laneCenter_x = xL + (xR-xL)/2
-    print("Center: ", laneCenter_x)
+    #print("Center: ", laneCenter_x)
 
     # compute number of pixels off center
     offCenter = laneCenter_x - camCenter_x
-    if offCenter < 0:
-        print("Car is ",abs(offCenter)," pixels left of center.")
-    elif offCenter > 0:
-        print("Car is ",offCenter," pixels right of center.")
+
+    # if offCenter < 0:
+    #     print("Car is ",abs(offCenter)," pixels left of center.")
+    # elif offCenter > 0:
+    #     print("Car is ",offCenter," pixels right of center.")
 
     # get x coordinate of horizon endpoint of L and R lane laneLines
     xL = l_line[2]
@@ -197,20 +210,23 @@ def pipeline(img):
     laneLines = groupLines(img,lines)
 
     # complete step 6 --> overlay detected lane lines onto original image
-    img = lineOverlay(img,[laneLines],)
+    overlayImg = lineOverlay(img,[laneLines],)
+    # if we do have L and R lines to work with
+    if overlayImg is not None:
+        # get coordinate of center of image
+        center_x = width//2
+        offCenter,laneCenterLine = getCenter(center_x,laneLines)
+        camCenterLine = [center_x,height,center_x,int(3*height/4)]
+
+        img = drawCenter(img,[camCenterLine],[laneCenterLine])
+    else:
+        overlayImg = img
+
     #display(img)
-
-    # get coordinate of center of image
-    center_x = width//2
-    offCenter,laneCenterLine = getCenter(center_x,laneLines)
-    camCenterLine = [center_x,height,center_x,int(3*height/4)]
-
-    img = drawCenter(img,[camCenterLine],[laneCenterLine])
-    display(img)
     #plt.figure()
     #plt.imshow(img)
     #cv2.waitKey(wait)
-    return img
+    return overlayImg
 
 ## Use pipeline to process still image
 def processImg():
@@ -233,15 +249,15 @@ def processVideo():
     cv2.destroyAllWindows()
 
 def saveVideo():
-    white_output = './video_output/test2_out.mp4'
-    clip1 = VideoFileClip("./test_video/test2.mp4")
+    white_output = './video_output/challenge_new.mp4'
+    clip1 = VideoFileClip("./test_video/challenge.mp4")
     white_clip = clip1.fl_image(pipeline)
     white_clip.write_videofile(white_output, audio=False)
 
 def main():
-    processImg()
+    #processImg()
     #processVideo()
-    #saveVideo()
+    saveVideo()
 
 
 
