@@ -2,6 +2,8 @@ import cv2
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from picamera import PiCamera
+import time
 #import matplotlib.image as mpimg
 
 from moviepy.editor import VideoFileClip
@@ -253,6 +255,20 @@ def saveVideo():
     clip1 = VideoFileClip("./test_video/challenge.mp4")
     white_clip = clip1.fl_image(pipeline)
     white_clip.write_videofile(white_output, audio=False)
+
+def processCam():
+    cam = PiCamera()
+    cam.framerate = 30
+    rawCap = PiRGBArray(camera)
+
+    time.sleep(0.1)
+    waitTime = 1
+    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+        img = frame.array()
+        pipeline(frame,waitTime)
+        if cv2.waitKey(1) == ord('q'):
+            break
+    cv2.destroyAllWindows()
 
 def main():
     #processImg()
