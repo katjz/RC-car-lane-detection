@@ -2,8 +2,6 @@ import cv2
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from picamera import PiCamera
-import time
 #import matplotlib.image as mpimg
 
 from moviepy.editor import VideoFileClip
@@ -118,8 +116,6 @@ def lineOverlay(img,lines,color=[0,255,0],thickness=4):
     # Merge line image with original img
     copy = cv2.addWeighted(copy,0.8,lineImg,1.0,0.0)
 
-
-
     # Create blank image of same size
     fillImg = np.zeros((copy.shape[0],copy.shape[1],3), dtype=np.uint8)
     # fill in region between lane lines
@@ -135,7 +131,6 @@ def lineOverlay(img,lines,color=[0,255,0],thickness=4):
     copy = cv2.addWeighted(fillImg,0.3,copy,1.0,0.0)
 
     return copy
-
 
 def getCenter(camCenter_x,laneLines):
     l_line = laneLines[0]
@@ -170,10 +165,11 @@ def drawCenter(img,camCenter,laneCenter):
     #lineImg = np.zeros((copy.shape[0],copy.shape[1],3), dtype=np.uint8)
 
     # Loop over lines and draw them on blank img
-    for x1,y1,x2,y2 in camCenter:
-        cv2.line(img,(x1,y1),(x2,y2),[255,0,0],4)
+
     for x1,y1,x2,y2 in laneCenter:
         cv2.line(img,(x1,y1),(x2,y2),[255,255,0],4)
+    for x1,y1,x2,y2 in camCenter:
+        cv2.arrowedLine(img,(x1,y1),(x2,y2),[255,0,0],4)
 
     # Merge line image with original img
     #copy = cv2.addWeighted(copy,0.8,lineImg,1.0,0.0)
@@ -184,7 +180,6 @@ def drawCenter(img,camCenter,laneCenter):
 def display(img):
     plt.imshow(img)
     plt.show()
-
 
 ### Pipeline Wrapper Function!
 # 5-step pipeline for image processing to detect lane lines.
@@ -219,15 +214,12 @@ def pipeline(img):
         center_x = width//2
         offCenter,laneCenterLine = getCenter(center_x,laneLines)
         camCenterLine = [center_x,height,center_x,int(3*height/4)]
-
-        img = drawCenter(img,[camCenterLine],[laneCenterLine])
+        overlayImg = drawCenter(overlayImg,[camCenterLine],[laneCenterLine])
     else:
         overlayImg = img
 
-    #display(img)
-    #plt.figure()
-    #plt.imshow(img)
-    #cv2.waitKey(wait)
+    #display(overlayImg)
+
     return overlayImg
 
 ## Use pipeline to process still image
@@ -236,7 +228,7 @@ def processImg():
     imgName = "./test_images/solidWhiteCurve.jpg"
     img = cv2.imread(imgName)
     img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-    pipeline(img) # wait is 0ms for still image
+    pipeline(img)
 
 ## Use pipeline to process video
 def processVideo():
@@ -251,24 +243,10 @@ def processVideo():
     cv2.destroyAllWindows()
 
 def saveVideo():
-    white_output = './video_output/challenge_new.mp4'
-    clip1 = VideoFileClip("./test_video/challenge.mp4")
-    white_clip = clip1.fl_image(pipeline)
-    white_clip.write_videofile(white_output, audio=False)
-
-def processCam():
-    cam = PiCamera()
-    cam.framerate = 30
-    rawCap = PiRGBArray(camera)
-
-    time.sleep(0.1)
-    waitTime = 1
-    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
-        img = frame.array()
-        pipeline(frame,waitTime)
-        if cv2.waitKey(1) == ord('q'):
-            break
-    cv2.destroyAllWindows()
+    output_name = './video_output/solidWhiteRight_new.mp4'
+    input_vid = VideoFileClip("./test_video/solidWhiteRight.mp4")
+    output_vid = input_vid.fl_image(pipeline)
+    output_vid.write_videofile(output_name, audio=False)
 
 def main():
     #processImg()
