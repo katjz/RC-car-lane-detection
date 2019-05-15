@@ -261,22 +261,10 @@ def processImg(fName):
 
     display(img)
 
-## Use pipeline to process video
-def processVideo():
-    waitTime = 1 # wait time of 1 ms for video read
-    vid = cv2.VideoCapture("./test_video/test2.mp4") # load video
-    while vid.isOpened():
-        frame = vid.read()[1]
-        pipeline(frame, waitTime)
-        if cv2.waitKey(1) == ord('q'):
-            break
-    vid.release()
-    cv2.destroyAllWindows()
-
 ## Use pipeline to process video and save processed video to folder
 def saveVideo(fName):
-    output_name = "./video_output/" + fName[12:]
-    input_vid = VideoFileClip("./test_video/solidYellowLeft.mp4")
+    output_name = "./video_output/" + fName[13:]
+    input_vid = VideoFileClip(fName)
     output_vid = input_vid.fl_image(pipeline)
     output_vid.write_videofile(output_name, audio=False)
 
