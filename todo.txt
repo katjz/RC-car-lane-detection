@@ -1,5 +1,0 @@
-1) Set up Raspberry Pi
-  - get it from Max
-  - make sure we can ssh into RaspberryPi
-  - download package python-rpi.gpio
-  -
