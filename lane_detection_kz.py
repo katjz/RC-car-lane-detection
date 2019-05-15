@@ -1,11 +1,16 @@
+import sys
+import os
 import cv2
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-#import matplotlib.image as mpimg
 
 from moviepy.editor import VideoFileClip
 from IPython.display import HTML
+
+###############################################################################
+# Encapsulated functions for each step in the lane detection Pipeline
+###############################################################################
 
 ## Step 1: Canny edge detection
 def canny(img):
@@ -42,7 +47,6 @@ def hough(img):
         maxLineGap=25
     )
     #print(lines)
-    #img = lineOverlay(img,lines)
     return lines
 
 ## Step 4: Extract single Left and Right lane lines
@@ -51,6 +55,7 @@ def groupLines(img,lines):
     if lines is None:
         return img
 
+    # Ignore lines with slope < 0.5. We are only concerned with lines that are closer to vertical.
     minSlope = 0.5
 
     leftLine_x = []
@@ -75,6 +80,7 @@ def groupLines(img,lines):
     min_y = img.shape[0] * (3/5) # min x --> just below horizon
     max_y = img.shape[0]        # max x --> bottom of image
 
+    # for lines in L and R groupings, respectively, calculate averaged lane line
     try:
         polyLeft = np.poly1d(np.polyfit(leftLine_y,leftLine_x,deg=1))
         left_x_start = int(polyLeft(max_y))
@@ -85,6 +91,8 @@ def groupLines(img,lines):
         right_x_start = int(polyRight(max_y))
         right_x_end = int(polyRight(min_y))
 
+    # If we are unable to perform averaging calculations due to lack of probable lines
+    # in either grouping, return None for L and R lane line
     except TypeError:
         return None
 
@@ -131,7 +139,14 @@ def lineOverlay(img,lines,color=[0,255,0],thickness=4):
     copy = cv2.addWeighted(fillImg,0.3,copy,1.0,0.0)
 
     return copy
+###############################################################################
+# End of pipeline functions
+###############################################################################
 
+###############################################################################
+# Functions for determining/reporting lane and camera centers
+###############################################################################
+##
 def getCenter(camCenter_x,laneLines):
     l_line = laneLines[0]
     r_line = laneLines[1]
@@ -144,11 +159,6 @@ def getCenter(camCenter_x,laneLines):
     # compute number of pixels off center
     offCenter = laneCenter_x - camCenter_x
 
-    # if offCenter < 0:
-    #     print("Car is ",abs(offCenter)," pixels left of center.")
-    # elif offCenter > 0:
-    #     print("Car is ",offCenter," pixels right of center.")
-
     # get x coordinate of horizon endpoint of L and R lane laneLines
     xL = l_line[2]
     xR = r_line[2]
@@ -158,14 +168,25 @@ def getCenter(camCenter_x,laneLines):
     centerLine = [int(laneCenter_x),l_line[1],topCenter_x,l_line[3]]
     return offCenter,centerLine
 
-def drawCenter(img,camCenter,laneCenter):
+def drawCenter(img,camCenter,laneCenter,offCenter):
     # Copy original image
     #copy = np.copy(img)
     # Create blank image of same size
     #lineImg = np.zeros((copy.shape[0],copy.shape[1],3), dtype=np.uint8)
 
-    # Loop over lines and draw them on blank img
+    pixels = int(abs(offCenter))
+    text = ""
+    if offCenter > 0:
+         text = "Car is " + str(pixels) + " pixels left of center."
+    elif offCenter < 0:
+         text = "Car is " + str(pixels) + " pixels right of center."
 
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 1
+    thick = 3
+    cv2.putText(img, text, (50,50), font, scale, (255,255,255),thick, cv2.LINE_AA)
+
+    # Loop over lines and draw them on blank img
     for x1,y1,x2,y2 in laneCenter:
         cv2.line(img,(x1,y1),(x2,y2),[255,255,0],4)
     for x1,y1,x2,y2 in camCenter:
@@ -175,13 +196,12 @@ def drawCenter(img,camCenter,laneCenter):
     #copy = cv2.addWeighted(copy,0.8,lineImg,1.0,0.0)
 
     return img
+###############################################################################
+# End center calculation functions
+###############################################################################
 
-# Helper function to display given image
-def display(img):
-    plt.imshow(img)
-    plt.show()
 
-### Pipeline Wrapper Function!
+######################### Pipeline Wrapper Function! ##########################
 # 5-step pipeline for image processing to detect lane lines.
 def pipeline(img):
     #wait = 1
@@ -214,21 +234,30 @@ def pipeline(img):
         center_x = width//2
         offCenter,laneCenterLine = getCenter(center_x,laneLines)
         camCenterLine = [center_x,height,center_x,int(3*height/4)]
-        overlayImg = drawCenter(overlayImg,[camCenterLine],[laneCenterLine])
+        overlayImg = drawCenter(overlayImg,[camCenterLine],[laneCenterLine],offCenter)
     else:
         overlayImg = img
 
     #display(overlayImg)
 
     return overlayImg
+###############################################################################
 
+# Helper function to display given image
+def display(img):
+    plt.imshow(img)
+    plt.show()
+
+###############################################################################
+# Wrapper functions to run pipeline with still image & video
+###############################################################################
 ## Use pipeline to process still image
-def processImg():
-    #imgName = "./test_images/test_image.jpg"
-    imgName = "./test_images/solidWhiteCurve.jpg"
-    img = cv2.imread(imgName)
+def processImg(fName):
+    img = cv2.imread(fName)
     img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
-    pipeline(img)
+    img = pipeline(img)
+
+    display(img)
 
 ## Use pipeline to process video
 def processVideo():
@@ -242,19 +271,64 @@ def processVideo():
     vid.release()
     cv2.destroyAllWindows()
 
-def saveVideo():
-    output_name = './video_output/solidWhiteRight_new.mp4'
-    input_vid = VideoFileClip("./test_video/solidWhiteRight.mp4")
+## Use pipeline to process video and save processed video to folder
+def saveVideo(fName):
+    output_name = "./video_output/" + fName[12:]
+    input_vid = VideoFileClip("./test_video/solidYellowLeft.mp4")
     output_vid = input_vid.fl_image(pipeline)
     output_vid.write_videofile(output_name, audio=False)
 
 def main():
-    #processImg()
-    #processVideo()
-    saveVideo()
+    if len(sys.argv) < 2:
+        done = False
+        while not done:
+            print()
+            print("Input the name of the file to be processed or the number corresponding to one of the suggested files.")
+            print("Videos:")
+            print("1) ./test_video/solidYellowLeft.mp4")
+            print("2) ./test_video/solidWhiteRight.mp4")
+            print("3) ./test_video/challenge.mp4")
+            print("Images:")
+            print("4) ./test_images/solidYellowCurve.jpg")
+            print("5) ./test_images/solidWhiteCurve.jpg")
+            print("6) ./test_images/test_image.jpg")
 
+            fName = input("File Name: ")
+            if fName == "1":
+                fName = "./test_video/solidYellowLeft.mp4"
+            elif fName == "2":
+                fName = "./test_video/solidWhiteRight.mp4"
+            elif fName == "3":
+                fName = "./test_video/challenge.mp4"
+            elif fName == "4":
+                fName = "./test_images/solidYellowCurve.jpg"
+            elif fName == "5":
+                fName = "./test_images/solidWhiteCurve.jpg"
+            elif fName == "6":
+                fName = "./test_images/test_image.jpg"
 
+            exists = os.path.isfile(fName)
+            if exists:
+                done = True
+            else:
+                print("\nFile not found.\n")
 
+    else:
+        fName = sys.argv[1]
+
+        exists = os.path.isfile(fName)
+        if exists:
+            done = True
+        else:
+            print("\nFile not found.\n")
+
+    # check file type and call correct wrapper function
+    if fName[-3:] == "jpg":
+        processImg(fName)
+    elif fName[-3:] == "mp4":
+        saveVideo(fName)
+    else:
+        print("Error: input file of type .jpg or .mp4")
 
 
 if __name__ == '__main__':
